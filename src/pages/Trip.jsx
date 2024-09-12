@@ -1,77 +1,97 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Input, Form, Select, DatePicker } from "antd";
+import React, { useContext, useState } from "react";
+import {
+  Table,
+  Button,
+  Modal,
+  Input,
+  Form,
+  Select,
+  DatePicker,
+  message,
+  Popconfirm,
+} from "antd";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
-import { v4 as uuidv4 } from "uuid"; // Để tạo ID cho Trip mới
+import AppContext from "../context/AppContext";
 import moment from "moment";
+import {
+  createTrip,
+  deleteTrip,
+  provinces,
+  updateTrip,
+} from "../services/trip";
 
 const { Option } = Select;
 
-const pickupLocations = [
-  { id: 1, name: "Central Station" },
-  { id: 2, name: "South Station" },
-];
-
-const dropoffLocations = [
-  { id: 1, name: "North Station" },
-  { id: 2, name: "East Station" },
-  { id: 3, name: "West Station" },
-];
-
-const buses = [
-  { id: 1, name: "Luxury Bus" },
-  { id: 2, name: "Standard Bus" },
-];
-
-const initialData = [
-  {
-    id: "1",
-    departureLocation: "an-giang",
-    arrivalLocation: "bac-giang",
-    distance: 100.5,
-    travelTime: "2",
-    creationDate: "2024-09-06",
-    departureTime: "2024-09-07T09:00:00",
-  },
-];
-
 const Trip = () => {
-  const [trips, setTrips] = useState(initialData);
+  const { trips, setTrips, buses, dropoffLocations, pickupLocations } =
+    useContext(AppContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   const [form] = Form.useForm();
 
-  // Handle Add Trip
-  const handleAddTrip = (values) => {
-    const newTrip = {
-      id: uuidv4(),
-      ...values,
-      creationDate: moment().format("YYYY-MM-DD"), // Tự động lấy ngày tạo
-      departureTime: values.departureTime.format("YYYY-MM-DDTHH:mm:ss"),
-    };
-    setTrips([...trips, newTrip]);
-    setIsModalOpen(false);
-    form.resetFields();
-    console.log(newTrip); // Log dữ liệu trip mới tạo
+  const handleAddTrip = async (values) => {
+    setIsLoading(true);
+    try {
+      const newTrip = {
+        ...values,
+        creationDate: moment().format("YYYY-MM-DD"),
+        departureTime: values.departureTime.format("YYYY-MM-DDTHH:mm:ss"),
+      };
+      const createdTrip = await createTrip(newTrip);
+      setTrips([...trips, createdTrip]);
+      setIsModalOpen(false);
+      form.resetFields();
+      console.log("New Trip:", createdTrip);
+      message.success("Trip added successfully!");
+    } catch (error) {
+      console.error("Failed to add trip:", error);
+      message.error("Failed to add trip!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Edit Trip
-  const handleEditTrip = (values) => {
-    const updatedTrips = trips.map((trip) =>
-      trip.id === selectedTrip.id ? { ...selectedTrip, ...values } : trip
-    );
-    setTrips(updatedTrips);
-    setIsEditModalOpen(false);
-    setSelectedTrip(null);
-    console.log("Updated Trip:", values);
+  const handleEditTrip = async (values) => {
+    setIsLoading(true);
+    try {
+      const updatedTrip = await updateTrip(selectedTrip.id, {
+        ...selectedTrip,
+        ...values,
+        departureTime: values.departureTime.format("YYYY-MM-DDTHH:mm:ss"),
+      });
+      const updatedTrips = trips.map((trip) =>
+        trip.id === selectedTrip.id ? updatedTrip : trip
+      );
+      setTrips(updatedTrips);
+      setIsEditModalOpen(false);
+      setSelectedTrip(null);
+      console.log("Updated Trip:", updatedTrip);
+      message.success("Trip updated successfully!");
+    } catch (error) {
+      console.error("Failed to update trip:", error);
+      message.error("Failed to update trip!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Delete Trip
-  const handleDeleteTrip = (id) => {
-    const filteredTrips = trips.filter((trip) => trip.id !== id);
-    setTrips(filteredTrips);
+  const handleDeleteTrip = async (id) => {
+    setIsLoading(true);
+    try {
+      await deleteTrip(id);
+      const filteredTrips = trips.filter((trip) => trip.id !== id);
+      setTrips(filteredTrips);
+      message.success("Trip deleted successfully!");
+    } catch (error) {
+      console.error("Failed to delete trip:", error);
+      message.error("Failed to delete trip!");
+    } finally {
+      setIsLoading(false);
+    }
   };
-
   // Open Edit Modal
   const openEditModal = (trip) => {
     setSelectedTrip(trip);
@@ -149,13 +169,17 @@ const Trip = () => {
           <Button
             icon={<EditOutlined />}
             onClick={() => openEditModal(trip)}
+            className="text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600"
             style={{ marginRight: 8 }}
-          ></Button>
-          <Button
-            icon={<DeleteOutlined />}
-            danger
-            onClick={() => handleDeleteTrip(trip.id)}
-          ></Button>
+          />
+          {/* <Popconfirm
+            title="Are you sure delete this bus?"
+            onConfirm={() => handleDeleteTrip(trip.id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button icon={<DeleteOutlined />} danger></Button>
+          </Popconfirm> */}
         </div>
       ),
     },
@@ -186,14 +210,26 @@ const Trip = () => {
             label="Departure Location"
             rules={[{ required: true }]}
           >
-            <Input />
+            <Select placeholder="Select Departure Location">
+              {provinces.map((province) => (
+                <Option key={province.slug} value={province.slug}>
+                  {province.name}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
           <Form.Item
             name="arrivalLocation"
             label="Arrival Location"
             rules={[{ required: true }]}
           >
-            <Input />
+            <Select placeholder="Select Arrival Location">
+              {provinces.map((province) => (
+                <Option key={province.slug} value={province.slug}>
+                  {province.name}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
           <Form.Item
             name="distance"
@@ -252,7 +288,7 @@ const Trip = () => {
             </Select>
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isLoading}>
               Create Trip
             </Button>
           </Form.Item>

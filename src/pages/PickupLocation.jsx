@@ -1,7 +1,12 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Input, Form, Popconfirm } from "antd";
+import React, { useContext, useState } from "react";
+import { Table, Button, Modal, Input, Form, Popconfirm, message } from "antd";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
-import { v4 as uuidv4 } from "uuid"; // Để tạo ID cho PickupLocation mới
+import AppContext from "../context/AppContext";
+import {
+  createPickupLocation,
+  deletePickupLocation,
+  updatePickupLocation,
+} from "../services/pickupLocation";
 
 const initialData = [
   {
@@ -17,43 +22,69 @@ const initialData = [
 ];
 
 const PickupLocation = () => {
-  const [locations, setLocations] = useState(initialData);
+  const { pickupLocations, setPickupLocations } = useContext(AppContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [form] = Form.useForm();
 
   // Handle Add Location
-  const handleAddLocation = (values) => {
-    const newLocation = {
-      id: uuidv4(),
-      ...values,
-    };
-    setLocations([...locations, newLocation]);
-    setIsModalOpen(false);
-    form.resetFields();
-    console.log(newLocation); // Log dữ liệu location mới tạo
+  const handleAddLocation = async (values) => {
+    setIsLoading(true);
+    try {
+      const newLocation = await createPickupLocation(values);
+      setPickupLocations([...pickupLocations, newLocation]);
+      setIsModalOpen(false);
+      form.resetFields();
+      console.log("New Location:", newLocation);
+      message.success("Location added successfully!");
+    } catch (error) {
+      console.error("Failed to add location:", error);
+      message.error("Failed to add location!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Edit Location
-  const handleEditLocation = (values) => {
-    const updatedLocations = locations.map((location) =>
-      location.id === selectedLocation.id
-        ? { ...selectedLocation, ...values }
-        : location
-    );
-    setLocations(updatedLocations);
-    setIsEditModalOpen(false);
-    setSelectedLocation(null);
-    console.log("Updated Location:", values);
+  const handleEditLocation = async (values) => {
+    setIsLoading(true);
+    try {
+      const updatedLocation = await updatePickupLocation(
+        selectedLocation.id,
+        values
+      );
+      const updatedLocations = pickupLocations.map((location) =>
+        location.id === selectedLocation.id ? updatedLocation : location
+      );
+      setPickupLocations(updatedLocations);
+      setIsEditModalOpen(false);
+      setSelectedLocation(null);
+      console.log("Updated Location:", updatedLocation);
+      message.success("Location updated successfully!");
+    } catch (error) {
+      console.error("Failed to update location:", error);
+      message.error("Failed to update location!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Delete Location
-  const handleDeleteLocation = (id) => {
-    const filteredLocations = locations.filter(
-      (location) => location.id !== id
-    );
-    setLocations(filteredLocations);
+  const handleDeleteLocation = async (id) => {
+    setIsLoading(true);
+    try {
+      await deletePickupLocation(id);
+      const filteredLocations = pickupLocations.filter(
+        (location) => location.id !== id
+      );
+      setPickupLocations(filteredLocations);
+      message.success("Location deleted successfully!");
+    } catch (error) {
+      console.error("Failed to delete location:", error);
+      message.error("Failed to delete location!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Open Edit Modal
@@ -107,8 +138,9 @@ const PickupLocation = () => {
           <Button
             icon={<EditOutlined />}
             onClick={() => openEditModal(location)}
+            className="text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600"
             style={{ marginRight: 8 }}
-          ></Button>
+          />
           <Popconfirm
             title="Are you sure delete this location?"
             onConfirm={() => handleDeleteLocation(location.id)}
@@ -129,7 +161,7 @@ const PickupLocation = () => {
       </Button>
       <Table
         columns={columns}
-        dataSource={locations}
+        dataSource={pickupLocations}
         rowKey="id"
         className="mt-4"
       />
@@ -153,7 +185,7 @@ const PickupLocation = () => {
             <Input />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isLoading}>
               Create Pickup Location
             </Button>
           </Form.Item>

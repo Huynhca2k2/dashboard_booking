@@ -1,13 +1,39 @@
 import React from "react";
-import { Layout, Input, Badge, Avatar, Dropdown, Menu, Breadcrumb } from "antd";
+import {
+  Layout,
+  Input,
+  Badge,
+  Avatar,
+  Dropdown,
+  Menu,
+  Breadcrumb,
+  message,
+} from "antd";
 import { SearchOutlined, BellOutlined, UserOutlined } from "@ant-design/icons";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { logout } from "../services/auth"; // Import hàm logout từ service
 
 const { Header } = Layout;
 
 const HeaderComponent = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const currentPath = location.pathname.split("/").filter((x) => x);
+
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (token) {
+        await logout(token);
+        localStorage.removeItem("token");
+        message.success("Logged out successfully!");
+        navigate("/login");
+      }
+    } catch (err) {
+      console.error("Logout error:", err);
+      message.error("An error occurred during logout.");
+    }
+  };
 
   const items = [
     {
@@ -20,7 +46,7 @@ const HeaderComponent = () => {
     },
     {
       key: "3",
-      label: <div>Log out</div>,
+      label: <div onClick={handleLogout}>Log out</div>,
     },
   ];
 

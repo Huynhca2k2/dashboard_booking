@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Card, Col, Divider, Row, Select } from "antd";
 import {
   DollarOutlined,
@@ -16,35 +16,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import AppContext from "../context/AppContext";
 
 const { Option } = Select;
-
-const cardData = [
-  {
-    icon: <DollarOutlined />,
-    title: "Today's Money",
-    number: "$2,345",
-    percentage: "+55% than last week",
-  },
-  {
-    icon: <UserOutlined />,
-    title: "New Users",
-    number: "1,234",
-    percentage: "+30% than last week",
-  },
-  {
-    icon: <ShoppingCartOutlined />,
-    title: "Orders",
-    number: "567",
-    percentage: "+20% than last week",
-  },
-  {
-    icon: <HomeOutlined />,
-    title: "Visits",
-    number: "4,567",
-    percentage: "+40% than last week",
-  },
-];
 
 // Sample data for the chart
 const weeklyData = [
@@ -74,7 +48,36 @@ const monthlyData = [
 ];
 
 const Dashboard = () => {
+  const { users, tickets } = useContext(AppContext);
   const [chartData, setChartData] = useState(weeklyData);
+  const totalPrice = tickets.reduce((total, ticket) => total + ticket.price, 0);
+
+  const cardData = [
+    {
+      icon: <DollarOutlined />,
+      title: "Total's Money",
+      number: `${new Intl.NumberFormat("en-US").format(totalPrice)} đ`,
+      percentage: "+55% than last week",
+    },
+    {
+      icon: <UserOutlined />,
+      title: "All User",
+      number: `${users?.length}`,
+      percentage: "+30% than last week",
+    },
+    {
+      icon: <ShoppingCartOutlined />,
+      title: "All Trip",
+      number: "567",
+      percentage: "+20% than last week",
+    },
+    {
+      icon: <HomeOutlined />,
+      title: "All Ticket",
+      number: "4,567",
+      percentage: "+40% than last week",
+    },
+  ];
 
   const handleChange = (value) => {
     if (value === "weekly") {

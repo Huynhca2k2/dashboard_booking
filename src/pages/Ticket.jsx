@@ -1,96 +1,116 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Form, Input, Select, DatePicker } from "antd";
+import React, { useContext, useState } from "react";
+import {
+  Table,
+  Button,
+  Modal,
+  Form,
+  Input,
+  Select,
+  DatePicker,
+  message,
+} from "antd";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
-import { v4 as uuidv4 } from "uuid";
+import AppContext from "../context/AppContext";
+import { createTicket, deleteTicket, updateTicket } from "../services/ticket";
+import moment from "moment";
 
 const { Option } = Select;
 
-const users = [
-  { id: "fee0ddb8-f761-4340-8ba0-137ef24dda54", name: "John Doe" },
-  { id: "e2d2a863-5bb7-4c8d-94d6-fdb3ea2741c0", name: "Jane Smith" },
-];
-
-const trips = [
-  { id: 1, departureLocation: "City A", arrivalLocation: "City B" },
-  { id: 2, departureLocation: "City C", arrivalLocation: "City D" },
-];
-
-const pickupLocations = [
-  { id: 1, name: "Location 1" },
-  { id: 2, name: "Location 2" },
-];
-
-const dropoffLocations = [
-  { id: 1, name: "Dropoff Location 1" },
-  { id: 2, name: "Dropoff Location 2" },
-  { id: 3, name: "Dropoff Location 3" },
-];
-
-const seats = [
-  { id: 34, seatCode: "A0" },
-  { id: 35, seatCode: "A1" },
-  { id: 36, seatCode: "A2" },
-  // Add more seats as needed
-];
-
-const tickets = [
-  {
-    id: 1,
-    price: 50.0,
-    creationDate: "2024-09-06",
-    discount: 5.0,
-    status: true,
-    userId: "fee0ddb8-f761-4340-8ba0-137ef24dda54",
-    tripId: 1,
-    busId: 3,
-    pickupLocationId: 2,
-    dropoffLocationId: 3,
-    seatIds: [34, 35, 36],
-  },
-];
-
 const Ticket = () => {
-  const [ticketData, setTicketData] = useState(tickets);
+  const {
+    users,
+    trips,
+    pickupLocations,
+    dropoffLocations,
+    seats,
+    tickets,
+    setTickets,
+  } = useContext(AppContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [seatsOfTicket, setSeatsOfTicket] = useState([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [form] = Form.useForm();
+  console.log(tickets);
+  const handleAddTicket = async (values) => {
+    setIsLoading(true);
+    try {
+      const newTicket = {
+        ...values,
+        creationDate: moment().format("YYYY-MM-DD"),
+      };
 
-  // Handle Add Ticket
-  const handleAddTicket = (values) => {
-    const newTicket = {
-      id: uuidv4(),
-      ...values,
-      creationDate: new Date().toISOString().split("T")[0],
-    };
-    setTicketData([...ticketData, newTicket]);
-    setIsModalOpen(false);
-    form.resetFields();
-    console.log("New Ticket:", newTicket);
+      const addedTicket = await createTicket(newTicket);
+      setTickets([...tickets, addedTicket]);
+      setIsModalOpen(false);
+      form.resetFields();
+      message.success("Ticket added successfully!");
+      console.log("New Ticket:", addedTicket);
+    } catch (error) {
+      console.error("Failed to add ticket:", error);
+      message.error("Failed to add ticket!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Edit Ticket
-  const handleEditTicket = (values) => {
-    const updatedTickets = ticketData.map((ticket) =>
-      ticket.id === selectedTicket.id
-        ? { ...selectedTicket, ...values }
-        : ticket
-    );
-    setTicketData(updatedTickets);
-    setIsEditModalOpen(false);
-    setSelectedTicket(null);
-    console.log("Updated Ticket:", values);
+  const handleEditTicket = async (values) => {
+    setIsLoading(true);
+    try {
+      const updatedTicket = { ...selectedTicket, ...values };
+
+      const result = await updateTicket(selectedTicket.id, updatedTicket);
+      const updatedTickets = tickets.map((ticket) =>
+        ticket.id === selectedTicket.id ? result : ticket
+      );
+
+      setTickets(updatedTickets);
+      setIsEditModalOpen(false);
+      setSelectedTicket(null);
+      message.success("Ticket updated successfully!");
+      console.log("Updated Ticket:", result);
+    } catch (error) {
+      console.error("Failed to update ticket:", error);
+      message.error("Failed to update ticket!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Delete Ticket
-  const handleDeleteTicket = (id) => {
-    const filteredTickets = ticketData.filter((ticket) => ticket.id !== id);
-    setTicketData(filteredTickets);
+  const handleDeleteTicket = async (id) => {
+    setIsLoading(true);
+    try {
+      await deleteTicket(id);
+      const filteredTickets = tickets.filter((ticket) => ticket.id !== id);
+      setTickets(filteredTickets);
+      message.success("Ticket deleted successfully!");
+    } catch (error) {
+      console.error("Failed to delete ticket:", error);
+      message.error("Failed to delete ticket!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Open Edit Modal
   const openEditModal = (ticket) => {
     setSelectedTicket(ticket);
+    form.setFieldsValue({
+      price: ticket.price,
+      discount: ticket.discount,
+      status: ticket.status,
+      userId: ticket.user?.id,
+      tripId: ticket.trip?.id,
+      busId: ticket.busSelectedId,
+      pickupLocationId: ticket.pickupLocation?.id,
+      dropoffLocationId: ticket.dropoffLocation?.id,
+      seatIds: ticket.seats?.map((seat) => seat.id),
+    });
+    // console.log("ticket item ", ticket.trip.buses[ticket.busSelectedId]);
+
+    setSeatsOfTicket(ticket.trip.buses.seats || ticket.seats);
+
     setIsEditModalOpen(true);
     form.setFieldsValue(ticket);
   };
@@ -101,15 +121,19 @@ const Ticket = () => {
       title: "Ticket Information",
       content: (
         <div>
-          <p>Price: ${ticket.price}</p>
-          <p>Discount: ${ticket.discount}</p>
-          <p>Status: {ticket.status ? "Active" : "Inactive"}</p>
-          <p>User ID: {ticket.userId}</p>
-          <p>Trip ID: {ticket.tripId}</p>
-          <p>Bus ID: {ticket.busId}</p>
-          <p>Pickup Location ID: {ticket.pickupLocationId}</p>
-          <p>Dropoff Location ID: {ticket.dropoffLocationId}</p>
-          <p>Seat IDs: {ticket.seatIds.join(", ")}</p>
+          <p>Price: {new Intl.NumberFormat("en-US").format(ticket?.price)} đ</p>
+          <p>Discount: ${ticket?.discount}</p>
+          <p>Status: {ticket?.status ? "Active" : "Inactive"}</p>
+          <p>User ID: {ticket?.user.id}</p>
+          <p>Trip ID: {ticket?.trip.id}</p>
+          <p>Bus ID: {ticket?.busSelectedId}</p>
+          <p>Pickup Location: {ticket?.pickupLocation.name}</p>
+          <p>Dropoff Location: {ticket?.dropoffLocation.name}</p>
+          <p>
+            Seats:{" "}
+            {ticket?.seats?.map((seat) => seat.seatCode).join(", ") ||
+              "No seat"}
+          </p>
         </div>
       ),
       onOk() {},
@@ -127,6 +151,7 @@ const Ticket = () => {
       title: "Price",
       dataIndex: "price",
       key: "price",
+      render: (text) => `${new Intl.NumberFormat("en-US").format(text)}đ`,
     },
     {
       title: "Discount",
@@ -141,35 +166,38 @@ const Ticket = () => {
     },
     {
       title: "User ID",
-      dataIndex: "userId",
       key: "userId",
+      render: (ticket) => ticket?.user?.id || "No user",
     },
     {
       title: "Trip ID",
-      dataIndex: "tripId",
       key: "tripId",
+      render: (ticket) => ticket?.trip?.id || "No trip",
     },
     {
       title: "Bus ID",
-      dataIndex: "busId",
-      key: "busId",
+      dataIndex: "busSelectedId",
+      key: "busSelectedId",
     },
     {
-      title: "Pickup Location ID",
-      dataIndex: "pickupLocationId",
-      key: "pickupLocationId",
+      title: "Pickup Location",
+      key: "pickupLocation",
+      render: (ticket) => ticket?.pickupLocation?.name || "No pickup location",
     },
     {
-      title: "Dropoff Location ID",
-      dataIndex: "dropoffLocationId",
-      key: "dropoffLocationId",
+      title: "Dropoff Location",
+      key: "dropoffLocation",
+      render: (ticket) =>
+        ticket?.dropoffLocation?.name || "No dropoff location",
     },
     {
-      title: "Seat IDs",
-      dataIndex: "seatIds",
-      key: "seatIds",
-      render: (seatIds) => seatIds.join(", "),
+      title: "Seat Codes",
+      dataIndex: "seats",
+      key: "seatCodes",
+      render: (seats) =>
+        seats?.map((seat) => seat.seatCode).join(", ") || "No seat",
     },
+
     {
       title: "Action",
       key: "action",
@@ -183,8 +211,9 @@ const Ticket = () => {
           <Button
             icon={<EditOutlined />}
             onClick={() => openEditModal(ticket)}
+            className="text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600"
             style={{ marginRight: 8 }}
-          ></Button>
+          />
           <Button
             icon={<DeleteOutlined />}
             danger
@@ -202,7 +231,7 @@ const Ticket = () => {
       </Button>
       <Table
         columns={columns}
-        dataSource={ticketData}
+        dataSource={tickets}
         rowKey="id"
         className="mt-4"
       />
@@ -279,7 +308,7 @@ const Ticket = () => {
             </Select>
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isLoading}>
               Save Ticket
             </Button>
           </Form.Item>
@@ -350,7 +379,7 @@ const Ticket = () => {
           </Form.Item>
           <Form.Item name="seatIds" label="Seats">
             <Select mode="multiple">
-              {seats.map((seat) => (
+              {seatsOfTicket.map((seat) => (
                 <Option key={seat.id} value={seat.id}>
                   {seat.seatCode}
                 </Option>

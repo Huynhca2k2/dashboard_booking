@@ -1,76 +1,93 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Input, Form, Select } from "antd";
+import React, { useContext, useState } from "react";
+import {
+  Table,
+  Button,
+  Modal,
+  Input,
+  Form,
+  Select,
+  Popconfirm,
+  message,
+} from "antd";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
-import { v4 as uuidv4 } from "uuid"; // Để tạo ID cho Seat mới
+import AppContext from "../context/AppContext";
+import moment from "moment";
+import { createSeatsBatch, updateSeat, deleteSeat } from "../services/seat";
 
 const { Option } = Select;
 
-const buses = [
-  { id: 1, name: "Luxury Bus", seatCapacity: 12 },
-  { id: 2, name: "Standard Bus", seatCapacity: 20 },
-];
-
-const trips = [
-  { id: "1", departureLocation: "an-giang", arrivalLocation: "bac-giang" },
-  { id: "2", departureLocation: "ca-mau", arrivalLocation: "ho-chi-min" },
-];
-
-const seats = [
-  { id: 34, seatCode: "A0", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 35, seatCode: "A1", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 36, seatCode: "A2", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 37, seatCode: "A3", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 38, seatCode: "A4", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 39, seatCode: "A5", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 40, seatCode: "A6", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 41, seatCode: "A7", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 42, seatCode: "A8", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 43, seatCode: "A9", status: "AVAILABLE", creationDate: "2024-09-07" },
-  { id: 44, seatCode: "A10", status: "AVAILABLE", creationDate: "2024-09-07" },
-];
-
 const Seat = () => {
-  const [seatData, setSeatData] = useState(seats);
+  const { buses, trips, seats, setSeats } = useContext(AppContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedSeat, setSelectedSeat] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [form] = Form.useForm();
 
   // Handle Add Seat
-  const handleAddSeat = (values) => {
+  const handleAddSeat = async (values) => {
+    setIsLoading(true);
     const newSeat = {
-      id: uuidv4(),
       ...values,
-      creationDate: new Date().toISOString().split("T")[0], // Tự động lấy ngày tạo
+      creationDate: moment().format("YYYY-MM-DD"),
     };
-    setSeatData([...seatData, newSeat]);
-    setIsModalOpen(false);
-    form.resetFields();
-    console.log(newSeat); // Log dữ liệu seat mới tạo
+    try {
+      await createSeatsBatch(newSeat);
+      setSeats([...seats, newSeat]);
+      setIsModalOpen(false);
+      form.resetFields();
+      console.log(newSeat);
+      message.success("Seat added successfully!");
+    } catch (error) {
+      console.error("Failed to add seat:", error);
+      message.error("Failed to add seat");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle Edit Seat
-  const handleEditSeat = (values) => {
-    const updatedSeats = seatData.map((seat) =>
-      seat.id === selectedSeat.id ? { ...selectedSeat, ...values } : seat
-    );
-    setSeatData(updatedSeats);
-    setIsEditModalOpen(false);
-    setSelectedSeat(null);
-    console.log("Updated Seat:", values);
+  const handleEditSeat = async (values) => {
+    setIsLoading(true);
+    try {
+      const updatedSeat = await updateSeat(selectedSeat.id, values);
+      const updatedSeats = seats.map((seat) =>
+        seat.id === selectedSeat.id ? updatedSeat : seat
+      );
+      setSeats(updatedSeats);
+      setIsEditModalOpen(false);
+      setSelectedSeat(null);
+      console.log("Updated Seat:", values);
+      message.success("Edit seat successfully!");
+    } catch (error) {
+      console.error("Failed to update seat:", error);
+      message.error("Failed to update seat!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle Delete Seat
-  const handleDeleteSeat = (id) => {
-    const filteredSeats = seatData.filter((seat) => seat.id !== id);
-    setSeatData(filteredSeats);
+  const handleDeleteSeat = async (id) => {
+    setIsLoading(true);
+    try {
+      await deleteSeat(id);
+      const filteredSeats = seats.filter((seat) => seat.id !== id);
+      setSeats(filteredSeats);
+      message.success("Delete seat successfully!");
+    } catch (error) {
+      message.error("Failed to delete seat");
+      console.error("Failed to delete seat:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Open Edit Modal
   const openEditModal = (seat) => {
     setSelectedSeat(seat);
     setIsEditModalOpen(true);
-    form.setFieldsValue(seat); // Set giá trị mặc định cho form
+    form.setFieldsValue(seat);
   };
 
   // Open Read Modal
@@ -123,13 +140,17 @@ const Seat = () => {
           <Button
             icon={<EditOutlined />}
             onClick={() => openEditModal(seat)}
+            className="text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600"
             style={{ marginRight: 8 }}
-          ></Button>
-          <Button
-            icon={<DeleteOutlined />}
-            danger
-            onClick={() => handleDeleteSeat(seat.id)}
-          ></Button>
+          />
+          <Popconfirm
+            title="Are you sure delete this seat?"
+            onConfirm={() => handleDeleteSeat(seat.id)}
+            okText="Yes"
+            cancelText="No"
+          >
+            <Button icon={<DeleteOutlined />} danger></Button>
+          </Popconfirm>
         </div>
       ),
     },
@@ -138,11 +159,11 @@ const Seat = () => {
   return (
     <div className="p-4 min-h-[620px]">
       <Button type="primary" onClick={() => setIsModalOpen(true)}>
-        Add Seat
+        Add Multiple Seat
       </Button>
       <Table
         columns={columns}
-        dataSource={seatData}
+        dataSource={seats}
         rowKey="id"
         className="mt-4"
       />
@@ -175,10 +196,10 @@ const Seat = () => {
             </Select>
           </Form.Item>
           <Form.Item name="seatCapacity" label="Seat Capacity">
-            <Input />{" "}
+            <Input />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isLoading}>
               Create Seat
             </Button>
           </Form.Item>
@@ -211,8 +232,21 @@ const Seat = () => {
               ))}
             </Select>
           </Form.Item>
+          <Form.Item
+            name="seatCode"
+            label="Seat Code"
+            rules={[{ required: true }]}
+          >
+            <Input />
+          </Form.Item>
+          <Form.Item name="status" label="Status" rules={[{ required: true }]}>
+            <Select>
+              <Option value="AVAILABLE">AVAILABLE</Option>
+              <Option value="UNAVAILABLE">UNAVAILABLE</Option>
+            </Select>
+          </Form.Item>
           <Form.Item name="seatCapacity" label="Seat Capacity">
-            <Input value={selectedSeat?.seatCapacity} />{" "}
+            <Input />
           </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit">

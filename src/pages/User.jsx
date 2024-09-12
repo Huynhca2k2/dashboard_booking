@@ -1,84 +1,112 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Input, Form, Popconfirm } from "antd";
+import React, { useContext, useState } from "react";
+import { Table, Button, Modal, Input, Form, Popconfirm, message } from "antd";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
-import { v4 as uuidv4 } from "uuid"; // Để tạo ID cho user mới
+import AppContext from "../context/AppContext";
+import { createUser, deleteUser, updateUser } from "../services/user";
 
-const initialData = [
-  {
-    id: "14080bd2-b5f5-49a4-8dfa-7997277c895a",
-    username: "huynh2",
-    firstName: "Huynh",
-    lastName: "Cai Hoang",
-    email: "johndoe@example.com",
-    phoneNumber: "+123456789",
-    dob: "2002-01-01",
-    roles: [
-      {
-        name: "USER",
-        description: "User role",
-        permissions: [],
-      },
-    ],
-  },
-  {
-    id: "14080bd2-b5f5-49a4-8dfa-1234567c895a",
-    username: "huynh3",
-    firstName: "Huynh3",
-    lastName: "Cai Hoang3",
-    email: "johndoe@example.com3",
-    phoneNumber: "+1234567893",
-    dob: "2002-01-013",
-    roles: [
-      {
-        name: "USER",
-        description: "User role",
-        permissions: [],
-      },
-    ],
-  },
-];
+// const initialData = [
+//   {
+//     id: "14080bd2-b5f5-49a4-8dfa-7997277c895a",
+//     username: "huynh2",
+//     firstName: "Huynh",
+//     lastName: "Cai Hoang",
+//     email: "johndoe@example.com",
+//     phoneNumber: "+123456789",
+//     dob: "2002-01-01",
+//     roles: [
+//       {
+//         name: "USER",
+//         description: "User role",
+//         permissions: [],
+//       },
+//     ],
+//   },
+//   {
+//     id: "14080bd2-b5f5-49a4-8dfa-1234567c895a",
+//     username: "huynh3",
+//     firstName: "Huynh3",
+//     lastName: "Cai Hoang3",
+//     email: "johndoe@example.com3",
+//     phoneNumber: "+1234567893",
+//     dob: "2002-01-013",
+//     roles: [
+//       {
+//         name: "USER",
+//         description: "User role",
+//         permissions: [],
+//       },
+//     ],
+//   },
+// ];
 
 const User = () => {
-  const [users, setUsers] = useState(initialData);
+  const { users, setUsers } = useContext(AppContext);
+  const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [form] = Form.useForm();
 
   // Handle Add User
-  const handleAddUser = (values) => {
-    const newUser = {
-      id: uuidv4(),
-      ...values,
-    };
-    setUsers([...users, newUser]);
-    setIsModalOpen(false);
-    form.resetFields();
-    console.log(newUser); // Log dữ liệu user mới tạo
+  const handleAddUser = async (values) => {
+    setIsLoading(true);
+    try {
+      const newUser = await createUser(values);
+      setUsers([...users, newUser]);
+      setIsModalOpen(false);
+      form.resetFields();
+      console.log("New User:", newUser);
+      message.success("create user success!!!");
+    } catch (error) {
+      console.error("Failed to create user:", error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle Edit User
-  const handleEditUser = (values) => {
-    const updatedUsers = users.map((user) =>
-      user.id === selectedUser.id ? { ...selectedUser, ...values } : user
-    );
-    setUsers(updatedUsers);
-    setIsEditModalOpen(false);
-    setSelectedUser(null);
-    console.log("Updated User:", values);
-  };
+  const handleEditUser = async (values) => {
+    setIsLoading(true);
+    try {
+      const updatedUser = await updateUser(selectedUser.id, values);
 
+      const updatedUsers = users.map((user) =>
+        user.id === selectedUser.id ? updatedUser : user
+      );
+      setUsers(updatedUsers);
+      setIsEditModalOpen(false);
+      setSelectedUser(null);
+      message.success("User updated successfully!");
+      console.log("Updated User:", updatedUser);
+    } catch (error) {
+      console.error("Failed to update user:", error);
+      message.error("Failed to update user!");
+    } finally {
+      setIsLoading(false);
+    }
+  };
   // Handle Delete User
-  const handleDeleteUser = (id) => {
-    const filteredUsers = users.filter((user) => user.id !== id);
-    setUsers(filteredUsers);
+  const handleDeleteUser = async (id) => {
+    setIsLoading(true);
+    try {
+      await deleteUser(id);
+
+      const filteredUsers = users.filter((user) => user.id !== id);
+      setUsers(filteredUsers);
+      message.success("User deleted successfully!");
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      message.error("Failed to delete user!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Open Edit Modal
   const openEditModal = (user) => {
     setSelectedUser(user);
     setIsEditModalOpen(true);
-    form.setFieldsValue(user); // Set giá trị mặc định cho form
+    form.setFieldsValue(user);
   };
 
   // Open Read Modal
@@ -145,16 +173,19 @@ const User = () => {
           <Button
             icon={<EditOutlined />}
             onClick={() => openEditModal(user)}
+            className=" text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600"
             style={{ marginRight: 8 }}
-          ></Button>
-          <Popconfirm
-            title="Are you sure delete this user?"
-            onConfirm={() => handleDeleteUser(user.id)}
-            okText="Yes"
-            cancelText="No"
-          >
-            <Button icon={<DeleteOutlined />} danger></Button>
-          </Popconfirm>
+          />
+          {user.roles[0]?.name !== "ADMIN" && (
+            <Popconfirm
+              title="Are you sure delete this user?"
+              onConfirm={() => handleDeleteUser(user.id)}
+              okText="Yes"
+              cancelText="No"
+            >
+              <Button icon={<DeleteOutlined />} danger></Button>
+            </Popconfirm>
+          )}
         </div>
       ),
     },
@@ -230,7 +261,7 @@ const User = () => {
           </Form.Item>
           <Form.Item>
             <div className="flex flex-row justify-center">
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={isLoading}>
                 Create User
               </Button>
             </div>
@@ -246,20 +277,6 @@ const User = () => {
         footer={null}
       >
         <Form form={form} onFinish={handleEditUser}>
-          <Form.Item
-            name="username"
-            label="Username"
-            rules={[{ required: true }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="password"
-            label="Password"
-            rules={[{ required: true }]}
-          >
-            <Input.Password />
-          </Form.Item>
           <Form.Item
             name="firstName"
             label="First Name"
@@ -292,7 +309,7 @@ const User = () => {
             <Input />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isLoading}>
               Save Edit
             </Button>
           </Form.Item>

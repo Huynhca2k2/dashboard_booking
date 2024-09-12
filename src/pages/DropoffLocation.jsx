@@ -1,59 +1,77 @@
-import React, { useState } from "react";
-import { Table, Button, Modal, Input, Form, Popconfirm } from "antd";
+import React, { useContext, useState } from "react";
+import { Table, Button, Modal, Input, Form, Popconfirm, message } from "antd";
 import { EditOutlined, DeleteOutlined, EyeOutlined } from "@ant-design/icons";
-import { v4 as uuidv4 } from "uuid"; // Để tạo ID cho DropoffLocation mới
-
-const initialData = [
-  {
-    id: 1,
-    name: "City Center",
-    address: "456 Elm St, City B",
-  },
-  {
-    id: 2,
-    name: "City Center2",
-    address: "456 Elm St, City B2",
-  },
-];
+import AppContext from "../context/AppContext";
+import {
+  createDropoffLocation,
+  deleteDropoffLocation,
+  updateDropoffLocation,
+} from "../services/dropoffLocation";
 
 const DropoffLocation = () => {
-  const [locations, setLocations] = useState(initialData);
+  const { dropoffLocations, setDropoffLocations } = useContext(AppContext);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [form] = Form.useForm();
 
   // Handle Add Location
-  const handleAddLocation = (values) => {
-    const newLocation = {
-      id: uuidv4(),
-      ...values,
-    };
-    setLocations([...locations, newLocation]);
-    setIsModalOpen(false);
-    form.resetFields();
-    console.log(newLocation); // Log dữ liệu location mới tạo
+  const handleAddLocation = async (values) => {
+    setIsLoading(true);
+    try {
+      const newLocation = await createDropoffLocation(values);
+      setDropoffLocations([...dropoffLocations, newLocation]);
+      setIsModalOpen(false);
+      form.resetFields();
+      console.log("New Location:", newLocation);
+      message.success("Location added successfully!");
+    } catch (error) {
+      console.error("Failed to add location:", error);
+      message.error("Failed to add location!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Edit Location
-  const handleEditLocation = (values) => {
-    const updatedLocations = locations.map((location) =>
-      location.id === selectedLocation.id
-        ? { ...selectedLocation, ...values }
-        : location
-    );
-    setLocations(updatedLocations);
-    setIsEditModalOpen(false);
-    setSelectedLocation(null);
-    console.log("Updated Location:", values);
+  const handleEditLocation = async (values) => {
+    setIsLoading(true);
+    try {
+      const updatedLocation = await updateDropoffLocation(
+        selectedLocation.id,
+        values
+      );
+      const updatedLocations = dropoffLocations.map((location) =>
+        location.id === selectedLocation.id ? updatedLocation : location
+      );
+      setDropoffLocations(updatedLocations);
+      setIsEditModalOpen(false);
+      setSelectedLocation(null);
+      console.log("Updated Location:", updatedLocation);
+      message.success("Location updated successfully!");
+    } catch (error) {
+      console.error("Failed to update location:", error);
+      message.error("Failed to update location!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  // Handle Delete Location
-  const handleDeleteLocation = (id) => {
-    const filteredLocations = locations.filter(
-      (location) => location.id !== id
-    );
-    setLocations(filteredLocations);
+  const handleDeleteLocation = async (id) => {
+    setIsLoading(true);
+    try {
+      await deleteDropoffLocation(id);
+      const filteredLocations = dropoffLocations.filter(
+        (location) => location.id !== id
+      );
+      setDropoffLocations(filteredLocations);
+      message.success("Location deleted successfully!");
+    } catch (error) {
+      console.error("Failed to delete location:", error);
+      message.error("Failed to delete location!");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Open Edit Modal
@@ -107,8 +125,9 @@ const DropoffLocation = () => {
           <Button
             icon={<EditOutlined />}
             onClick={() => openEditModal(location)}
+            className="text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600"
             style={{ marginRight: 8 }}
-          ></Button>
+          />
           <Popconfirm
             title="Are you sure delete this location?"
             onConfirm={() => handleDeleteLocation(location.id)}
@@ -129,7 +148,7 @@ const DropoffLocation = () => {
       </Button>
       <Table
         columns={columns}
-        dataSource={locations}
+        dataSource={dropoffLocations}
         rowKey="id"
         className="mt-4"
       />
@@ -153,7 +172,7 @@ const DropoffLocation = () => {
             <Input />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" htmlType="submit">
+            <Button type="primary" htmlType="submit" loading={isLoading}>
               Create Dropoff Location
             </Button>
           </Form.Item>
